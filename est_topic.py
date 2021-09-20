@@ -1,6 +1,7 @@
 import numpy as np
 import math
 from collections import Counter
+import argparse
 
 import gen_crp
 
@@ -30,10 +31,10 @@ def est_topic(
         for i_doc in range(n_doc):
             other_topics = {
                 j_doc:topic_id for j_doc, topic_id in enumerate(est_topics)
-                if topic_id>0 and i_doc==j_doc
+                if topic_id>0 and i_doc!=j_doc
             }
             
-            counter_other_topics = Counter(other_topics) 
+            counter_other_topics = Counter(other_topics.values()) 
             i_topic_to_topic_id = [topic_id for topic_id
                                    in counter_other_topics.keys()]
             n_doc_for_each_topic = [n_doc for n_doc
@@ -43,22 +44,25 @@ def est_topic(
                      for n_doc_for_this_topic in n_doc_for_each_topic]
             this_doc_length = len(documents[i_doc])
             n_word_for_this_doc = Counter(documents[i_doc])
-            for i_topic, topic_id in enumerate(other_topics.keys()):
+            for i_topic, topic_id in enumerate(i_topic_to_topic_id):
                 words_for_this_topic = []
                 for j_doc in other_topics.keys():
                     if other_topics[j_doc]==topic_id:
                         words_for_this_topic.extend(documents[j_doc])
                 n_all_word_for_this_topic = len(words_for_this_topic)
-                log_prob = math.lgamma(n_all_word_for_this_topic+beta*n_vocab)
-                log_prob -= math.lgamma(n_all_word_for_this_topic+this_doc_length+beta*n_vocab)
+                N = n_all_word_for_this_topic+beta*n_vocab
+                log_prob = math.lgamma(N)
+                log_prob -= math.lgamma(N+this_doc_length)
                 n_this_word_for_this_topic = Counter(words_for_this_topic)
                 for vocab, n_this_word_for_this_doc in n_word_for_this_doc.items():
                     n_this_word_for_other_doc = n_this_word_for_this_topic[vocab]
-                    log_prob += math.lgamma(n_this_word_for_other_doc+n_this_word_for_this_doc+beta)
-                    log_prob -= math.lgamma(n_this_word_for_other_doc+beta)
+                    N = n_this_word_for_other_doc+beta
+                    log_prob += math.lgamma(N+n_this_word_for_this_doc)
+                    log_prob -= math.lgamma(N)
                 probs[i_topic] *= math.exp(log_prob)    
             probs.append(alpha)
-            log_prob = math.lgamma(beta*n_vocab)-math.lgamma(this_doc_length+beta*n_vocab) 
+            log_prob = math.lgamma(beta*n_vocab)
+            log_prob -= math.lgamma(this_doc_length+beta*n_vocab) 
             for vocab, n_this_word_for_this_doc in n_word_for_this_doc.items():
                 log_prob += math.lgamma(n_this_word_for_this_doc+beta)
                 log_prob -= math.lgamma(beta)
@@ -76,13 +80,14 @@ def est_topic(
                     max(i_topic_to_topic_id)+1
                     if n_topic>0 else 1
                 )
+            print(i_doc, n_loop, other_topics, probs)
                 
         n_loop += 1
         if est_topics[i_doc]==orig_topic:
             n_consecutive_unchanged += 1
         else:
             n_consecutive_unchanged += 0
-        if n_consecutive_unchanged>2*n_doc or n_loop>100*n_doc:
+        if n_consecutive_unchanged>5*n_doc or n_loop>100*n_doc:
             break
 
     return est_topics
@@ -90,8 +95,23 @@ def est_topic(
 
 if __name__ == "__main__":
 
+    parser = argparse.ArgumentParser(
+        description="",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+    parser.add_argument(
+        "doc_len",
+        nargs="+",
+        type=int,
+        help="list of each document length",
+    )
+
+    args = parser.parse_args()
+    doc_len = args.doc_len
+
     topics, documents = gen_crp.gen_crp(
-        doc_len=[1,1,2,2,3,4,5,6,7,8,8],
+        doc_len=doc_len,
     )
 
     est_topics = est_topic(
