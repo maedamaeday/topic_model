@@ -1,4 +1,4 @@
-# implementation of topics with Chinese Restaurant Process
+# implementation of topics estimation with Chinese Restaurant Process
 
 ## overview
 Data generation and topic estimation by mixture of unigram models
