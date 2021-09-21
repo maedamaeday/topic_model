@@ -12,19 +12,17 @@ def_alpha=gen_crp.def_alpha
 def_beta=gen_crp.def_beta
 
 def est_topic(
-        topics:List[int],
         documents:List[List[int]],
         alpha:float = def_alpha,
         beta:float = def_beta,
         n_vocab:int = def_n_vocab,
 ) -> List[int]:
 
-    n_doc = len(topics)
-    assert len(documents)==n_doc, "# of topics and documents is different"
+    n_doc = len(documents)
 
     rng = np.random.default_rng()
     
-    est_topics = [0]*len(topics)
+    est_topics = [0]*n_doc
     n_loop = 0
     n_consecutive_unchanged = 0
     while True:
@@ -80,7 +78,6 @@ def est_topic(
                     max(i_topic_to_topic_id)+1
                     if n_topic>0 else 1
                 )
-            print(i_doc, n_loop, other_topics, probs)
                 
         n_loop += 1
         if est_topics[i_doc]==orig_topic:
@@ -96,7 +93,7 @@ def est_topic(
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
-        description="",
+        description="topic estimation with Chinese Restaurant Process",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -109,17 +106,31 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     doc_len = args.doc_len
+    n_doc = len(doc_len)
 
     topics, documents = gen_crp.gen_crp(
         doc_len=doc_len,
+        alpha=def_alpha,
+        beta=def_beta,
+        n_vocab=def_n_vocab,
     )
 
     est_topics = est_topic(
-        topics=topics,
         documents=documents,
     )
 
-    print(topics)
-    print(est_topics)
-    
-    
+    orig_to_new_id = {}
+    mod_est_topics = []
+    for topic_id in est_topics:
+        if topic_id not in orig_to_new_id.keys():
+            orig_to_new_id[topic_id] = len(orig_to_new_id)
+        mod_est_topics.append( orig_to_new_id[topic_id] )
+
+    n_wrong = 0
+    for true, pred in zip(topics, mod_est_topics):
+        is_wrong = (true!=pred)
+        print(true, pred, (" **" if is_wrong else ""))
+        if is_wrong:
+            n_wrong += 1
+    print()
+    print(f"n_wrong = {n_wrong} / {n_doc}")
